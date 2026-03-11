@@ -4,4 +4,4 @@ venv
 .env
 .terraform/
 *.tfstate
-*.tfstate.*
+*.tfstate.*.github/workflows/key.json
