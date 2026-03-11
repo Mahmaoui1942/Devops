@@ -1,0 +1,114 @@
+:root{
+  /* --showColorMenu: hidden; */
+  --showLoadScreen: visible;
+  --showErrorScreen: hidden;
+}
+
+.App {
+  text-align: center;
+  position: relative;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+.canvas {
+  /*border:5px solid #000000;
+  position: absolute;
+  top:0;
+  bottom: 0;
+  left: 0;
+  right: 0; */
+  margin:auto;
+  image-rendering: optimizeSpeed;           
+  image-rendering: -moz-crisp-edges;        
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -o-crisp-edges;          
+  image-rendering: crisp-edges;             
+  -ms-interpolation-mode: nearest-neighbor; 
+}
+
+.loadScreen{
+  border:10px solid #000000;
+  background-color: #444444;
+  color: #ffffff;
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 20%;
+  right: 20%;
+  
+  visibility: var(--showLoadScreen);
+}
+
+.errorScreen{
+  border:10px solid #000000;
+  background-color: #8f1d1d;
+  color: #ffffff;
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 20%;
+  right: 20%;
+  
+  visibility: var(--showErrorScreen);
+}
+
+
+.colorChoice{
+  border:4px solid #000000;
+  background-color: #ffffff;
+  position: absolute;
+  bottom: 5%;
+  left: 20%;
+  right: 20%;
+
+  visibility: visible;
+}
+
+/*that might not be very responsive, change when possible*/
+.colorButton{
+  display: inline-block;
+  font-size: 16px;
+  margin: 5px 5px;
+  cursor: pointer;
+  width: 70px;
+  height: 40px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+body {
+  overflow-y: hidden; /* Hide vertical scrollbar */
+  overflow-x: hidden; /* Hide horizontal scrollbar */
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
