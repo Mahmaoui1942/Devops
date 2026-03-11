@@ -8,7 +8,7 @@ games_db = {}
 
 @games_bp.route('', methods=['POST'])
 def create_game():
-    """Create a new game"""
+
     data = request.get_json()
     game_id = data.get('game_id')
     if game_id in games_db:
