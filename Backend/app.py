@@ -1,15 +1,20 @@
 from flask import Flask
+from flask_cors import CORS
 from User.UserCRUD import users_bp
+from Game.GameCRUD import games_bp
 
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route('/')
 def home():
-    return "Hello, world!"
+    return {"message": "pixelWar Backend API", "version": "1.0"}
 
 app.register_blueprint(users_bp)
+app.register_blueprint(games_bp)
 
-app.run(port=5000)
+if __name__ == '__main__':
+    app.run(port=5000, debug=True)
 
 
