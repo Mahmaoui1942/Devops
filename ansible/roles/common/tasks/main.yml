@@ -51,6 +51,7 @@
     path: /etc/ssh/sshd_config
     regexp: '^PermitRootLogin'
     line: 'PermitRootLogin no'
+  ignore_errors: true
   notify: restart ssh
 
 - name: Disable SSH password auth
@@ -58,4 +59,5 @@
     path: /etc/ssh/sshd_config
     regexp: '^PasswordAuthentication'
     line: 'PasswordAuthentication no'
+  ignore_errors: true  
   notify: restart ssh

@@ -28,7 +28,7 @@
 
 - name: Add deploy user to docker group
   user:
-    name: "{{ ansible_user }}"
+    name: "{{ ansible_user | default(ansible_env.USER) }}"
     groups: docker
     append: true
 
