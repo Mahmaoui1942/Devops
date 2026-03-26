@@ -1,0 +1,12 @@
+---
+- name: Configure all nodes
+  hosts: all
+  become: true
+  roles:
+    - common
+
+- name: Install Docker on all nodes
+  hosts: all
+  become: true
+  roles:
+    - docker

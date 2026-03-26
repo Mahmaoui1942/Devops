@@ -1,0 +1,136 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PROJECT_ID: pixel-war-489910
+  REGION: europe-west1
+  REGISTRY: europe-west1-docker.pkg.dev
+  REPO: pixel-war
+  CLUSTER: pixel-war-cluster
+  CLUSTER_ZONE: europe-west1-b
+
+jobs:
+  # ─── Tests ────────────────────────────────────────────────────────────────
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r Backend/requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 Backend/ --max-line-length=120 --exclude=__pycache__
+
+  # ─── Build & Push ─────────────────────────────────────────────────────────
+  build-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: test-backend
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      backend_tag: ${{ steps.meta-backend.outputs.version }}
+      frontend_tag: ${{ steps.meta-frontend.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Set image tags
+        id: tags
+        run: echo "sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/backend:${{ steps.tags.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/backend:latest
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./pixel-war
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/frontend:${{ steps.tags.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/frontend:latest
+
+  # ─── Deploy ───────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: build-push
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.CLUSTER }}
+          location: ${{ env.CLUSTER_ZONE }}
+
+      - name: Create namespace if missing
+        run: kubectl get namespace pixelwar || kubectl create namespace pixelwar
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/secret.yaml       -n pixelwar
+          kubectl apply -f k8s/db.yaml           -n pixelwar
+          kubectl apply -f k8s/backend.yaml      -n pixelwar
+          kubectl apply -f k8s/frontend.yaml     -n pixelwar
+          kubectl apply -f k8s/ingress/          -n pixelwar
+          kubectl apply -f k8s/monitoring/       -n monitoring --create-namespace
+
+      - name: Update backend image
+        run: |
+          kubectl set image deployment/backend \
+            backend=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/backend:${GITHUB_SHA::8} \
+            -n pixelwar
+
+      - name: Update frontend image
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO }}/frontend:${GITHUB_SHA::8} \
+            -n pixelwar
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend  -n pixelwar --timeout=120s
+          kubectl rollout status deployment/frontend -n pixelwar --timeout=120s
