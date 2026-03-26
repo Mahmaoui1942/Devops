@@ -1,143 +1,75 @@
-import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
-
-const _APIURL = "https://pixel-api.edgarbaudry.dev"; //"https://pixel-war-api.herokuapp.com" "http://localhost:8090"
-const connecEndPoint = "/connect";
-const requestGetEndPoint = "/grid/get";
-const requestPlaceEndPoint = "/app/grid/place";
-const subscribePixelUpdateEndPoint = "/topic/pixel_update";
-const subscribeFullUpdateEndPoint = "/topic/full_update";
-const connectionAttemptsDelay = 500;//ms
-var isConnected = false;
-
-var stompClient = null;
+const GAME_ID = "main";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+const POLL_INTERVAL = 2000; // ms — poll grid every 2s for updates
 
 var fullUpdateCallBack = () => {};
 var pixelUpdateCallBack = () => {};
 var errorCallBack = () => {};
 var connectCallBack = () => {};
+var pollTimer = null;
 
+// Ensure the default game exists, then signal connection success
+const ensureGame = async () => {
+  try {
+    // Try to create the game (idempotent — 409 if already exists)
+    await fetch(`${BACKEND_URL}/games`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_id: GAME_ID, title: "ISIMA Pixel War", width: 50, height: 50 }),
+    });
+  } catch (e) {
+    // network error
+    errorCallBack(e);
+    return;
+  }
+  connectCallBack();
+};
 
-export const connect = (fullUpdateCallBackFunc, pixelUpdateCallBackFunc, connectCallBackFunc, errorCallBackFunc) => {
-  fullUpdateCallBack = fullUpdateCallBackFunc;
-  pixelUpdateCallBack = pixelUpdateCallBackFunc;
-  errorCallBack = errorCallBackFunc;
-  connectCallBack = connectCallBackFunc;
-
-  // create STOMP client that uses SockJS
-  const client = new Client({
-    brokerURL: undefined, // we use webSocketFactory instead
-    webSocketFactory: () => new SockJS(_APIURL + connecEndPoint),
-    connectHeaders: {},
-    debug: () => {}, // silence verbose logging (restore for debugging)
-    reconnectDelay: connectionAttemptsDelay,
-    onConnect: () => {
-      isConnected = true;
-
-      client.subscribe(subscribeFullUpdateEndPoint, (message) => {
-        try {
-          onFullUpdateReceived(JSON.parse(message.body));
-        } catch (e) {
-          console.error("Failed to parse full update payload", e);
-        }
-      });
-
-      client.subscribe(subscribePixelUpdateEndPoint, (message) => {
-        try {
-          onPixelUpdateReceived(JSON.parse(message.body));
-        } catch (e) {
-          console.error("Failed to parse pixel update payload", e);
-        }
-      });
-
-      connectCallBack();
-    },
-    onStompError: (frame) => {
-      onError(frame);
-    },
-    onWebSocketClose: () => {
-      isConnected = false;
-    }
-  });
-  stompClient = client;
-  client.activate();
-
-  // return cleanup function
-  return () => client.deactivate();
-}
+export const connect = (fullUpdateCB, pixelUpdateCB, connectCB, errorCB) => {
+  fullUpdateCallBack = fullUpdateCB;
+  pixelUpdateCallBack = pixelUpdateCB;
+  connectCallBack = connectCB;
+  errorCallBack = errorCB;
+  ensureGame();
+};
 
 export const gridGet = () => {
-  fetch(_APIURL + requestGetEndPoint)
-  .then(async response => {
-    const data = await response.json();
+  fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`)
+    .then(async (res) => {
+      if (!res.ok) throw new Error("grid fetch failed");
+      const grid = await res.json();
+      // grid is array[y][x], build the expected {width, height, grid} object
+      const height = grid.length;
+      const width = height > 0 ? grid[0].length : 0;
+      fullUpdateCallBack({ width, height, grid });
 
-    // check for error response
-    if (!response.ok) {
-      // get error message from body or default to response statusText
-      const error = (data && data.message) || response.statusText;
-      onError(error);
-      return;
-    }
+      // Start polling for updates
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(pollGrid, POLL_INTERVAL);
+    })
+    .catch((e) => errorCallBack(e));
+};
 
-    onFullUpdateReceived(data);
-  })
-  .catch(error => {
-    onError(error);
-  });
-}
+const pollGrid = () => {
+  fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`)
+    .then(async (res) => {
+      if (!res.ok) return;
+      const grid = await res.json();
+      const height = grid.length;
+      const width = height > 0 ? grid[0].length : 0;
+      fullUpdateCallBack({ width, height, grid });
+    })
+    .catch(() => {});
+};
 
 export const gridPlace = (x, y, color) => {
-  var message = {
-    x:x,
-    y:y,
-    color:color
-  };
-  stompClient.publish({ destination: requestPlaceEndPoint, body: JSON.stringify(message) });
-  pixelUpdateCallBack(message);
-}
-
-const reattemptConnection = () => {
-  if(!isConnected){
-    stompClient.connect({}, onConnected, onError);
-  }
-}
-
-const onConnected = () => {
-  console.log("Connection Success");
-
-  isConnected = true;
-
-  stompClient.subscribe(subscribeFullUpdateEndPoint, (payload) => {
-    onFullUpdateReceived(JSON.parse(payload.body));
-  });
-
-  stompClient.subscribe(subscribePixelUpdateEndPoint, (payload) => {
-    onPixelUpdateReceived(JSON.parse(payload.body));
-  });
-
-  connectCallBack();
-}
-
-// const convertRecievedMessageToJSON = (payload) => {
-//   onMessageReceived(JSON.parse(payload.body));
-// }
-
-const onPixelUpdateReceived = (data)=>{
-  // console.log("Pixel Update Arrived");
-  // console.log(data);
-
-  pixelUpdateCallBack(data);
-}
-
-const onFullUpdateReceived = (data)=>{
-  // console.log("Message Arrived");
-  // console.log(data);
-
-  fullUpdateCallBack(data);
-}
-
-const onError = (err) => {
-  console.error("beep boop error :(", err);
-  isConnected = false;
-  errorCallBack(err);
-}
+  fetch(`${BACKEND_URL}/games/${GAME_ID}/pixel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ x, y, color }),
+  })
+    .then((res) => {
+      if (res.ok) pixelUpdateCallBack({ x, y, color });
+    })
+    .catch((e) => console.error("place pixel error", e));
+};
