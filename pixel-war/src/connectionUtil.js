@@ -1,5 +1,5 @@
 const GAME_ID = "main";
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = "/api";
 const POLL_INTERVAL = 2000;
 
 var fullUpdateCallBack = () => {};
@@ -38,6 +38,7 @@ export const gridGet = () => {
       const height = grid.length;
       const width = height > 0 ? grid[0].length : 0;
       fullUpdateCallBack({ width, height, grid });
+
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(pollGrid, POLL_INTERVAL);
     })
@@ -62,6 +63,8 @@ export const gridPlace = (x, y, color) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ x, y, color }),
   })
-    .then((res) => { if (res.ok) pixelUpdateCallBack({ x, y, color }); })
+    .then((res) => {
+      if (res.ok) pixelUpdateCallBack({ x, y, color });
+    })
     .catch((e) => console.error("place pixel error", e));
 };

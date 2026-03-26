@@ -14,9 +14,6 @@ spec:
       labels:
         app: db
     spec:
-      securityContext:
-        runAsUser: 999
-        fsGroup: 999
       containers:
         - name: db
           image: postgres:15-alpine
@@ -32,8 +29,6 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          securityContext:
-              fsGroup: 999
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "pixelwar"]
