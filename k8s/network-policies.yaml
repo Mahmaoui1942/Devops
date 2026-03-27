@@ -10,6 +10,32 @@ spec:
     - Ingress
     - Egress
 ---
+# Allow traffic from ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: pixelwar
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - port: 80
+---
 # Frontend: accepte trafic entrant (Ingress), peut joindre le backend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -25,7 +51,7 @@ spec:
     - Egress
   ingress:
     - ports:
-        - port: 80
+        - port: 8080
   egress:
     - to:
         - podSelector:
