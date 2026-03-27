@@ -54,8 +54,8 @@ jobs:
       id-token: write
 
     outputs:
-      backend_tag: ${{ steps.meta-backend.outputs.version }}
-      frontend_tag: ${{ steps.meta-frontend.outputs.version }}
+      backend_tag: ${{ steps.tags.outputs.sha }}
+      frontend_tag: ${{ steps.tags.outputs.sha }}
 
     steps:
       - uses: actions/checkout@v4
