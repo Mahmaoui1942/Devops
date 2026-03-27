@@ -10,7 +10,7 @@ spec:
     - Ingress
     - Egress
 ---
-# Allow traffic from ingress controller
+# Allow traffic from ingress controller (any external traffic)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,16 +23,13 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # Allow from any namespace (includes ingress-nginx and external)
     - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
+        - namespaceSelector: {}
       ports:
         - port: 8080
     - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
+        - namespaceSelector: {}
       ports:
         - port: 80
 ---
