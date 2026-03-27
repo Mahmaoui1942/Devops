@@ -121,6 +121,7 @@ jobs:
           kubectl apply -f k8s/db.yaml           -n pixelwar
           kubectl apply -f k8s/backend.yaml      -n pixelwar
           kubectl apply -f k8s/frontend.yaml     -n pixelwar
+          kubectl apply -f k8s/network-policies.yaml -n pixelwar
           kubectl apply -f k8s/ingress/          -n pixelwar
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -f k8s/monitoring/ -n monitoring
@@ -161,12 +162,36 @@ jobs:
           
           echo "=== BACKEND LOGS ==="
           kubectl logs deployment/backend -n pixelwar --tail=100 --all-containers || true
-      - name: Print Live URL
+      - name: Wait for Ingress Address
         run: |
-          echo "Waiting 30 seconds for Google to assign an IP..."
-          sleep 30
-          echo "=== YOUR LIVE WEBSITE IP ==="
+          echo "Waiting for external ingress address (can take several minutes on GKE)..."
+          ADDRESS=""
+          for i in {1..30}; do
+            IP=$(kubectl get ingress pixelwar-ingress -n pixelwar -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            HOST=$(kubectl get ingress pixelwar-ingress -n pixelwar -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            ADDRESS=${IP:-$HOST}
+            if [ -n "$ADDRESS" ]; then
+              break
+            fi
+            echo "Attempt $i/30: ingress address not ready yet..."
+            sleep 20
+          done
+
+          echo "=== INGRESS STATUS ==="
           kubectl get ingress -n pixelwar
+
+          if [ -z "$ADDRESS" ]; then
+            echo "ERROR: Ingress address was not assigned in time."
+            echo "Describe ingress for troubleshooting:"
+            kubectl describe ingress pixelwar-ingress -n pixelwar || true
+            exit 1
+          fi
+
+          echo "=== YOUR LIVE WEBSITE ADDRESS ==="
+          echo "$ADDRESS"
+
+      - name: Print Services
+        run: |
           echo "=== ALL SERVICES ==="
           kubectl get svc -n pixelwar
       - name: The Ultimate Debug
