@@ -190,6 +190,28 @@ jobs:
           echo "=== YOUR LIVE WEBSITE ADDRESS ==="
           echo "$ADDRESS"
 
+          echo "INGRESS_ADDRESS=$ADDRESS" >> $GITHUB_ENV
+
+      - name: Smoke Test Public HTTP
+        run: |
+          echo "Testing public HTTP reachability for $INGRESS_ADDRESS ..."
+          for i in {1..12}; do
+            CODE=$(curl -s -o /tmp/home.html -w "%{http_code}" --max-time 10 "http://$INGRESS_ADDRESS/" || true)
+            if [ "$CODE" = "200" ] || [ "$CODE" = "301" ] || [ "$CODE" = "302" ]; then
+              echo "Public HTTP check passed with status $CODE"
+              exit 0
+            fi
+            echo "Attempt $i/12 failed (status: ${CODE:-none}), retrying in 10s..."
+            sleep 10
+          done
+
+          echo "ERROR: Public HTTP is still unreachable from the GitHub runner."
+          echo "Last ingress status:"
+          kubectl get ingress -n pixelwar
+          echo "Describe ingress:"
+          kubectl describe ingress pixelwar-ingress -n pixelwar || true
+          exit 1
+
       - name: Print Services
         run: |
           echo "=== ALL SERVICES ==="
