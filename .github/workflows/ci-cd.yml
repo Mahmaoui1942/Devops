@@ -161,3 +161,11 @@ jobs:
           
           echo "=== BACKEND LOGS ==="
           kubectl logs deployment/backend -n pixelwar --tail=100 --all-containers || true
+      - name: Print Live URL
+        run: |
+          echo "Waiting 30 seconds for Google to assign an IP..."
+          sleep 30
+          echo "=== YOUR LIVE WEBSITE IP ==="
+          kubectl get ingress -n pixelwar
+          echo "=== ALL SERVICES ==="
+          kubectl get svc -n pixelwar
