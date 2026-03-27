@@ -22,7 +22,7 @@ spec:
         - name: frontend
           image: europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/frontend:latest
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           resources:
             requests:
               cpu: "50m"
