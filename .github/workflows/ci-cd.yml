@@ -141,3 +141,14 @@ jobs:
         run: |
           kubectl rollout status deployment/backend  -n pixelwar --timeout=120s
           kubectl rollout status deployment/frontend -n pixelwar --timeout=120s
+      - name: Debug Deployment Failure
+        if: failure()
+        run: |
+          echo "=== POD STATUS ==="
+          kubectl get pods -n pixelwar
+          
+          echo "=== WHY ARE PODS FAILING? (EVENTS) ==="
+          kubectl describe pod -l app=backend -n pixelwar
+          
+          echo "=== BACKEND LOGS ==="
+          kubectl logs deployment/backend -n pixelwar --tail=100 --all-containers || true
