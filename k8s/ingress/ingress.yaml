@@ -4,22 +4,21 @@ metadata:
   name: pixelwar-ingress
   namespace: pixelwar
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    kubernetes.io/ingress.global-static-ip-name: "pixelwar-ip"
 spec:
-  ingressClassName: nginx
+  ingressClassName: gce
   rules:
     - http:
         paths:
-          - path: /api
-            pathType: Prefix
+          - path: /api/*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: backend
                 port:
                   number: 5000
-          - path: /
-            pathType: Prefix
+          - path: /*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: frontend
