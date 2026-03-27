@@ -122,7 +122,8 @@ jobs:
           kubectl apply -f k8s/backend.yaml      -n pixelwar
           kubectl apply -f k8s/frontend.yaml     -n pixelwar
           kubectl apply -f k8s/ingress/          -n pixelwar
-          kubectl apply -f k8s/monitoring/       -n monitoring --create-namespace
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/monitoring/ -n monitoring
 
       - name: Update backend image
         run: |
