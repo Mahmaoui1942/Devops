@@ -15,9 +15,9 @@ spec:
       labels:
         app: frontend
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 101   # nginx default non-root user
+     # securityContext:
+      #  runAsNonRoot: true
+       # runAsUser: 101   # nginx default non-root user
       containers:
         - name: frontend
           image: europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/frontend:latest
