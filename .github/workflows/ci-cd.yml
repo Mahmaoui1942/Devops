@@ -139,16 +139,25 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/backend  -n pixelwar --timeout=120s
-          kubectl rollout status deployment/frontend -n pixelwar --timeout=120s
+          kubectl rollout status deployment/backend  -n pixelwar --timeout=300s
+          kubectl rollout status deployment/frontend -n pixelwar --timeout=600s
       - name: Debug Deployment Failure
         if: failure()
         run: |
-          echo "=== POD STATUS ==="
-          kubectl get pods -n pixelwar
-          
-          echo "=== WHY ARE PODS FAILING? (EVENTS) ==="
-          kubectl describe pod -l app=backend -n pixelwar
+          echo "=== POD STATUS (pixelwar) ==="
+          kubectl get pods -n pixelwar -o wide
+      
+          echo "=== RECENT EVENTS (pixelwar) ==="
+          kubectl get events -n pixelwar --sort-by=.lastTimestamp | tail -n 50
+      
+          echo "=== DESCRIBE FRONTEND PODS ==="
+          kubectl describe pod -l app=frontend -n pixelwar || true
+      
+          echo "=== FRONTEND LOGS (all containers) ==="
+          kubectl logs -l app=frontend -n pixelwar --tail=200 --all-containers || true
+      
+          echo "=== DESCRIBE FRONTEND DEPLOYMENT ==="
+          kubectl describe deployment frontend -n pixelwar || true
           
           echo "=== BACKEND LOGS ==="
           kubectl logs deployment/backend -n pixelwar --tail=100 --all-containers || true
