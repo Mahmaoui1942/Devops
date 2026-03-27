@@ -182,3 +182,13 @@ jobs:
           
           echo "=== 4. FRONTEND LOGS ==="
           kubectl logs deployment/frontend -n pixelwar --tail=50 || true
+      - name: Debug Database Storage
+        run: |
+          echo "=== 1. WHY IS THE DB POD PENDING? ==="
+          kubectl describe pod db-0 -n pixelwar | tail -n 20
+          
+          echo "=== 2. IS THE HARD DRIVE STUCK? ==="
+          kubectl get pvc -n pixelwar
+          
+          echo "=== 3. WHAT STORAGE CLASSES DO WE HAVE? ==="
+          kubectl get storageclass
