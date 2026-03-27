@@ -169,3 +169,16 @@ jobs:
           kubectl get ingress -n pixelwar
           echo "=== ALL SERVICES ==="
           kubectl get svc -n pixelwar
+      - name: The Ultimate Debug
+        run: |
+          echo "=== 1. ARE THE PODS ACTUALLY RUNNING? ==="
+          kubectl get pods -n pixelwar
+          
+          echo "=== 2. ARE THE SERVICES SEEING THE PODS? ==="
+          kubectl get endpoints -n pixelwar
+          
+          echo "=== 3. INGRESS ROUTING ==="
+          kubectl describe ingress -n pixelwar
+          
+          echo "=== 4. FRONTEND LOGS ==="
+          kubectl logs deployment/frontend -n pixelwar --tail=50 || true
