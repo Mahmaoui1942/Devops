@@ -1,5 +1,6 @@
 import uuid
 
-class User :
-    id : uuid.UUID
-    username : str
+
+class User:
+    id: uuid.UUID
+    username: str

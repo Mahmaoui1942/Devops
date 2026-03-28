@@ -5,6 +5,7 @@ users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
 users_db = {}
 
+
 @users_bp.route('', methods=['POST'])
 def create_user():
     """Create a new user"""
@@ -15,6 +16,7 @@ def create_user():
     users_db[user_id] = {'user_id': user_id, 'username': data.get('username'), 'score': 0}
     return jsonify(users_db[user_id]), 201
 
+
 @users_bp.route('/<user_id>', methods=['GET'])
 def get_user(user_id):
     """Get user by ID"""
@@ -22,6 +24,7 @@ def get_user(user_id):
     if not user:
         return jsonify({'error': 'user not found'}), 404
     return jsonify(user), 200
+
 
 @users_bp.route('/<user_id>', methods=['PUT'])
 def update_user(user_id):
@@ -32,6 +35,7 @@ def update_user(user_id):
     users_db[user_id].update(data)
     return jsonify(users_db[user_id]), 200
 
+
 @users_bp.route('/<user_id>', methods=['DELETE'])
 def delete_user(user_id):
     """Delete user"""
@@ -39,6 +43,7 @@ def delete_user(user_id):
         return jsonify({'error': 'user not found'}), 404
     del users_db[user_id]
     return jsonify({'message': 'user deleted'}), 204
+
 
 @users_bp.route('', methods=['GET'])
 def list_users():

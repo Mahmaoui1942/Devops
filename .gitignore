@@ -5,3 +5,6 @@ venv
 .terraform/
 *.tfstate
 *.tfstate.*.github/workflows/key.json
+__pycache__/
+*.pyc
+.pytest_cache/
