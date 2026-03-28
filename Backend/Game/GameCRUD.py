@@ -115,10 +115,12 @@ def place_pixel(game_id):
         cur.execute("SELECT width, height FROM games WHERE game_id = %s", (game_id,))
         row = cur.fetchone()
         if not row:
-            cur.close(); conn.close()
+            cur.close()
+            conn.close()
             return jsonify({'error': 'game not found'}), 404
         if x < 0 or x >= row['width'] or y < 0 or y >= row['height']:
-            cur.close(); conn.close()
+            cur.close()
+            conn.close()
             return jsonify({'error': 'pixel out of bounds'}), 400
         cur.execute(
             """

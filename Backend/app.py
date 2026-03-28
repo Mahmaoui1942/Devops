@@ -8,9 +8,11 @@ app = Flask(__name__)
 CORS(app)
 metrics = PrometheusMetrics(app)
 
+
 @app.route('/')
 def home():
     return {"message": "pixelWar Backend API", "version": "1.0"}
+
 
 app.register_blueprint(users_bp)
 app.register_blueprint(games_bp)

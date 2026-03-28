@@ -40,8 +40,11 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          # Keep the build green while you fix the 14 errors found earlier
-          flake8 Backend/ --max-line-length=120 --exit-zero
+          flake8 Backend/ --max-line-length=120
+
+      - name: Run tests
+        run: |
+          pytest Backend/tests/ -v --cov=Backend --cov-report=term-missing
 
   # ─── Build & Push ─────────────────────────────────────────────────────────
   build-push:
