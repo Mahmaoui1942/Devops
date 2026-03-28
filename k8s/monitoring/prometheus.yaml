@@ -88,6 +88,7 @@ spec:
       labels:
         app: prometheus
     spec:
+      priorityClassName: pixelwar-app-standard
       serviceAccountName: prometheus
       securityContext:
         runAsNonRoot: true

@@ -110,6 +110,7 @@ spec:
       labels:
         app: grafana
     spec:
+      priorityClassName: pixelwar-app-standard
       securityContext:
         runAsNonRoot: true
         runAsUser: 472

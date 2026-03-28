@@ -15,6 +15,7 @@ spec:
       labels:
         app: frontend
     spec:
+      priorityClassName: pixelwar-app-standard
      # securityContext:
       #  runAsNonRoot: true
        # runAsUser: 101   # nginx default non-root user

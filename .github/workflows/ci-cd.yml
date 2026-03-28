@@ -117,6 +117,7 @@ jobs:
 
       - name: Apply Kubernetes manifests
         run: |
+          kubectl apply -f k8s/priority-classes.yaml
           kubectl apply -f k8s/secret.yaml       -n pixelwar
           kubectl apply -f k8s/db.yaml           -n pixelwar
           kubectl apply -f k8s/backend.yaml      -n pixelwar

@@ -1,0 +1,15 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: pixelwar-db-critical
+value: 1000000
+globalDefault: false
+description: "Critical priority for PixelWar PostgreSQL to avoid prolonged Pending state under node CPU pressure."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: pixelwar-app-standard
+value: 1000
+globalDefault: false
+description: "Standard priority for PixelWar application workloads."

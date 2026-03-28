@@ -19,6 +19,7 @@ spec:
         prometheus.io/port: "5000"
         prometheus.io/path: "/metrics"
     spec:
+      priorityClassName: pixelwar-app-standard
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

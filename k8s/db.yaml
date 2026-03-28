@@ -14,6 +14,7 @@ spec:
       labels:
         app: db
     spec:
+      priorityClassName: pixelwar-db-critical
       containers:
         - name: db
           image: postgres:15-alpine
