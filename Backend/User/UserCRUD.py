@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-users_bp = Blueprint('users', __name__, url_prefix='/users')
+users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
 
 users_db = {}

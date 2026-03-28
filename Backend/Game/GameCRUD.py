@@ -5,7 +5,7 @@ import psycopg2.extras
 import os
 import json
 
-games_bp = Blueprint('games', __name__, url_prefix='/games')
+games_bp = Blueprint('games', __name__, url_prefix='/api/games')
 games_memory = {}
 
 
