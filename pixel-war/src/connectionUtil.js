@@ -1,6 +1,6 @@
 let activeGameId = "main";
 const BACKEND_URL = "/api";
-const POLL_INTERVAL = 2000;
+const POLL_INTERVAL = 700;
 const CONNECT_RETRY_DELAY_MS = 2000;
 const MAX_CONNECT_RETRIES = 20;
 
@@ -9,6 +9,7 @@ var pixelUpdateCallBack = () => {};
 var errorCallBack = () => {};
 var connectCallBack = () => {};
 var pollTimer = null;
+var pollInFlight = false;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -92,6 +93,8 @@ export const gridGet = () => {
 };
 
 const pollGrid = () => {
+  if (pollInFlight) return;
+  pollInFlight = true;
   fetch(`${BACKEND_URL}/games/${activeGameId}/grid`)
     .then(async (res) => {
       if (!res.ok) return;
@@ -100,7 +103,10 @@ const pollGrid = () => {
       const width = height > 0 ? grid[0].length : 0;
       fullUpdateCallBack({ width, height, grid });
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      pollInFlight = false;
+    });
 };
 
 export const gridPlace = (x, y, color) => {

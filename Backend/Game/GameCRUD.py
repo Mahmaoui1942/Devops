@@ -112,17 +112,22 @@ def place_pixel(game_id):
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT * FROM games WHERE game_id = %s FOR UPDATE", (game_id,))
+        cur.execute("SELECT width, height FROM games WHERE game_id = %s", (game_id,))
         row = cur.fetchone()
         if not row:
             cur.close(); conn.close()
             return jsonify({'error': 'game not found'}), 404
-        grid = row['grid']
         if x < 0 or x >= row['width'] or y < 0 or y >= row['height']:
             cur.close(); conn.close()
             return jsonify({'error': 'pixel out of bounds'}), 400
-        grid[y][x] = color
-        cur.execute("UPDATE games SET grid = %s WHERE game_id = %s", (json.dumps(grid), game_id))
+        cur.execute(
+            """
+            UPDATE games
+            SET grid = jsonb_set(grid, ARRAY[%s, %s]::text[], to_jsonb(%s::int), false)
+            WHERE game_id = %s
+            """,
+            (y, x, color, game_id)
+        )
         conn.commit()
         cur.close()
         conn.close()
