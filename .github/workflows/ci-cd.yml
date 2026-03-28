@@ -127,6 +127,12 @@ jobs:
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -f k8s/monitoring/ -n monitoring
 
+      - name: Refresh DB Pod Template
+        run: |
+          kubectl delete pod db-0 -n pixelwar --ignore-not-found=true
+          sleep 5
+          kubectl get pod db-0 -n pixelwar -o wide || true
+
       - name: Update backend image
         run: |
           kubectl set image deployment/backend \

@@ -32,6 +32,9 @@ variable "zone" {
 variable "node_count" {
   default = 2
 }
+variable "max_node_count" {
+  default = 6
+}
 variable "machine_type" {
   default = "e2-medium"
 }
@@ -78,7 +81,12 @@ resource "google_container_node_pool" "pixel_war_nodes" {
   name       = "pixel-war-node-pool"
   location   = var.zone
   cluster    = google_container_cluster.pixel_war.name
-  node_count = var.node_count
+  initial_node_count = var.node_count
+
+  autoscaling {
+    min_node_count = var.node_count
+    max_node_count = var.max_node_count
+  }
 
   management {
     auto_repair  = true
