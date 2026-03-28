@@ -81,6 +81,10 @@ spec:
       ports:
         - port: 5000
     - from:
+        - namespaceSelector: {}
+      ports:
+        - port: 5000
+    - from:
         - ipBlock:
             cidr: 35.191.0.0/16
         - ipBlock:
