@@ -1,6 +1,8 @@
 const GAME_ID = "main";
 const BACKEND_URL = "/api";
 const POLL_INTERVAL = 2000;
+const CONNECT_RETRY_DELAY_MS = 2000;
+const MAX_CONNECT_RETRIES = 20;
 
 var fullUpdateCallBack = () => {};
 var pixelUpdateCallBack = () => {};
@@ -8,18 +10,33 @@ var errorCallBack = () => {};
 var connectCallBack = () => {};
 var pollTimer = null;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const ensureGame = async () => {
-  try {
-    await fetch(`${BACKEND_URL}/games`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_id: GAME_ID, title: "ISIMA Pixel War", width: 50, height: 50 }),
-    });
-  } catch (e) {
-    errorCallBack(e);
-    return;
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt += 1) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/games`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: GAME_ID, title: "ISIMA Pixel War", width: 50, height: 50 }),
+      });
+
+      if (response.ok || response.status === 409) {
+        connectCallBack();
+        return;
+      }
+
+      lastError = new Error(`create game failed with status ${response.status}`);
+    } catch (e) {
+      lastError = e;
+    }
+
+    await sleep(CONNECT_RETRY_DELAY_MS);
   }
-  connectCallBack();
+
+  errorCallBack(lastError || new Error("unable to connect to backend"));
 };
 
 export const connect = (fullUpdateCB, pixelUpdateCB, connectCB, errorCB) => {
@@ -31,18 +48,33 @@ export const connect = (fullUpdateCB, pixelUpdateCB, connectCB, errorCB) => {
 };
 
 export const gridGet = () => {
-  fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`)
-    .then(async (res) => {
-      if (!res.ok) throw new Error("grid fetch failed");
-      const grid = await res.json();
-      const height = grid.length;
-      const width = height > 0 ? grid[0].length : 0;
-      fullUpdateCallBack({ width, height, grid });
+  const loadGrid = async () => {
+    let lastError;
 
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(pollGrid, POLL_INTERVAL);
-    })
-    .catch((e) => errorCallBack(e));
+    for (let attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt += 1) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`);
+        if (!res.ok) throw new Error(`grid fetch failed with status ${res.status}`);
+
+        const grid = await res.json();
+        const height = grid.length;
+        const width = height > 0 ? grid[0].length : 0;
+        fullUpdateCallBack({ width, height, grid });
+
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(pollGrid, POLL_INTERVAL);
+        return;
+      } catch (e) {
+        lastError = e;
+      }
+
+      await sleep(CONNECT_RETRY_DELAY_MS);
+    }
+
+    errorCallBack(lastError || new Error("unable to load game grid"));
+  };
+
+  loadGrid();
 };
 
 const pollGrid = () => {
