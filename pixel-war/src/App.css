@@ -68,6 +68,34 @@
   visibility: visible;
 }
 
+.gameChoice{
+  border:4px solid #000000;
+  background-color: #ffffff;
+  position: absolute;
+  top: 3%;
+  left: 20%;
+  right: 20%;
+  padding: 8px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.gameInput{
+  min-width: 180px;
+  padding: 6px 8px;
+}
+
+.gameButton{
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.gameCurrent{
+  font-size: 14px;
+}
+
 /*that might not be very responsive, change when possible*/
 .colorButton{
   display: inline-block;

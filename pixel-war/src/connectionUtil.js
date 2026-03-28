@@ -1,4 +1,4 @@
-const GAME_ID = "main";
+let activeGameId = "main";
 const BACKEND_URL = "/api";
 const POLL_INTERVAL = 2000;
 const CONNECT_RETRY_DELAY_MS = 2000;
@@ -12,6 +12,20 @@ var pollTimer = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export const setGameId = (gameId) => {
+  if (!gameId || !gameId.trim()) return;
+  activeGameId = gameId.trim();
+};
+
+export const getGameId = () => activeGameId;
+
+export const disconnect = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
 const ensureGame = async () => {
   let lastError;
 
@@ -20,7 +34,7 @@ const ensureGame = async () => {
       const response = await fetch(`${BACKEND_URL}/games`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_id: GAME_ID, title: "ISIMA Pixel War", width: 50, height: 50 }),
+        body: JSON.stringify({ game_id: activeGameId, title: `Pixel War - ${activeGameId}`, width: 50, height: 50 }),
       });
 
       if (response.ok || response.status === 409) {
@@ -53,7 +67,7 @@ export const gridGet = () => {
 
     for (let attempt = 1; attempt <= MAX_CONNECT_RETRIES; attempt += 1) {
       try {
-        const res = await fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`);
+        const res = await fetch(`${BACKEND_URL}/games/${activeGameId}/grid`);
         if (!res.ok) throw new Error(`grid fetch failed with status ${res.status}`);
 
         const grid = await res.json();
@@ -78,7 +92,7 @@ export const gridGet = () => {
 };
 
 const pollGrid = () => {
-  fetch(`${BACKEND_URL}/games/${GAME_ID}/grid`)
+  fetch(`${BACKEND_URL}/games/${activeGameId}/grid`)
     .then(async (res) => {
       if (!res.ok) return;
       const grid = await res.json();
@@ -90,7 +104,7 @@ const pollGrid = () => {
 };
 
 export const gridPlace = (x, y, color) => {
-  fetch(`${BACKEND_URL}/games/${GAME_ID}/pixel`, {
+  fetch(`${BACKEND_URL}/games/${activeGameId}/pixel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ x, y, color }),

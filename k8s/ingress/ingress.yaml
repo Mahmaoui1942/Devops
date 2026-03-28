@@ -7,6 +7,23 @@ metadata:
     kubernetes.io/ingress.class: "gce"
 spec:
   rules:
+    - host: pixelwarsawesome.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
     - http:
         paths:
           - path: /api

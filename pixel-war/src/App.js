@@ -1,5 +1,5 @@
 import { pickColor, pickRGBColor, colorNum } from './utils.js'
-import { connect, gridGet, gridPlace } from './connectionUtil.js'
+import { connect, gridGet, gridPlace, setGameId, disconnect } from './connectionUtil.js'
 import './App.css';
 import { useEffect, useRef, useState } from 'react';
 
@@ -16,7 +16,7 @@ const windowBackgroundColor = "#6f6f6f";
 const gridColor = windowBackgroundColor;
 
 var mapWidth = 0; var mapHeight = 0;
-var pixelColor = Array(mapWidth).fill(0).map(x => Array(mapHeight).fill(0)); //[x,y] 0=white, 1=lgray, ... (see utils)
+var pixelColor = [];
 
 var selectedColor = -1;
 var hasConnected = false;
@@ -34,12 +34,22 @@ var windowDim = { x: 0, y: 0 };
 
 var currentImage = new Image();
 var imgData;
+var imageCanvas = null;
+var imageContext = null;
 // var currentPixelTesselationInImage = 1;
 
 
 function App() {
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
+  const [gameInput, setGameInput] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('game') || 'main';
+  });
+  const [currentGame, setCurrentGame] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('game') || 'main';
+  });
 
   const update = () => {
     if (!hasConnected)
@@ -69,13 +79,38 @@ function App() {
   }
 
   useEffect(() => {
+    setGameId(gameInput);
+    setCurrentGame(gameInput);
     resizeWindow();
     const interval = setInterval(() => {
       update();
     }, 1000 / frameRate);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const switchGame = () => {
+    const nextGame = gameInput.trim();
+    if (!nextGame) return;
+
+    const params = new URLSearchParams(window.location.search);
+    params.set('game', nextGame);
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', nextUrl);
+
+    disconnect();
+    setGameId(nextGame);
+    setCurrentGame(nextGame);
+    hasConnected = false;
+    mapWidth = 0;
+    mapHeight = 0;
+    pixelColor = [];
+    document.documentElement.style.setProperty('--showLoadScreen', "visible");
+    document.documentElement.style.setProperty('--showErrorScreen', "hidden");
+  }
 
   const attemptConnection = () => {
     hasConnected = true;
@@ -101,23 +136,30 @@ function App() {
     pixelColor = data.grid.map(function (arr) {
       return arr.slice();
     });
-    // updateImageAtNextRender = true;
     updateImage();
     renderCanvas();
   }
 
   const updatePixel = (data) => {
-    // updateImageAtNextRender = true;
     changePixelColor(data.x, data.y, data.color);
   }
 
   const changePixelColor = (x, y, color) => {
-    pixelColor[x][y] = color;
+    if (!pixelColor[y]) return;
+    pixelColor[y][x] = color;
     updateImageSinglePixel(x, y, color);
     renderCanvas();
   }
 
-  const updateImage = async () => {
+  const updateImage = () => {
+
+    if (!imageCanvas) {
+      imageCanvas = document.createElement('canvas');
+      imageContext = imageCanvas.getContext('2d');
+    }
+
+    imageCanvas.width = mapWidth;
+    imageCanvas.height = mapHeight;
 
     imgData = contextRef.current.createImageData(mapWidth, mapHeight);
 
@@ -125,7 +167,7 @@ function App() {
 
       for (var y = 0; y < mapHeight; ++y) {
 
-        const col = pickRGBColor(pixelColor[x][y]);
+        const col = pickRGBColor(pixelColor[y][x]);
         const index = 4 * (x + y * mapWidth);
 
         imgData.data[index + 0] = col[0];
@@ -136,12 +178,15 @@ function App() {
       }
     }
 
-    currentImage = await imagedata_to_image(imgData);
+    imageContext.putImageData(imgData, 0, 0);
+    currentImage = imageCanvas;
 
     renderCanvas();
   }
 
-  const updateImageSinglePixel = async (x, y, color) => {
+  const updateImageSinglePixel = (x, y, color) => {
+
+    if (!imgData) return;
 
     const index = 4 * (x + y * mapWidth);
     const col = pickRGBColor(color);
@@ -149,7 +194,10 @@ function App() {
     imgData.data[index + 1] = col[1];
     imgData.data[index + 2] = col[2];
     imgData.data[index + 3] = 255;
-    currentImage = await imagedata_to_image(imgData);
+    if (imageContext) {
+      imageContext.putImageData(imgData, 0, 0);
+      currentImage = imageCanvas;
+    }
 
     renderCanvas();
   }
@@ -203,7 +251,7 @@ function App() {
     contextRef.current.fillStyle = "#e8b61e";
     contextRef.current.fillRect(hoverX - hoveringOverlaySize * pixelSize, hoverY - hoveringOverlaySize * pixelSize, (1 + 2 * hoveringOverlaySize) * pixelSize, (1 + 2 * hoveringOverlaySize) * pixelSize);
 
-    contextRef.current.fillStyle = pickColor(pixelColor[hoveringPixel.x][hoveringPixel.y]);
+    contextRef.current.fillStyle = pickColor(pixelColor[hoveringPixel.y][hoveringPixel.x]);
     contextRef.current.fillRect(hoverX + hoveringOverlaySize * pixelSize, hoverY + hoveringOverlaySize * pixelSize, (1 - 2 * hoveringOverlaySize) * pixelSize, (1 - 2 * hoveringOverlaySize) * pixelSize);
   }
 
@@ -451,6 +499,20 @@ function App() {
         <h1>Could not Connect to Server :</h1> <br />
         <h1>Please try to Refreshing the Page a couple times</h1> <br />
         <h2>It may take a few seconds for the server to start up if it was asleep</h2> <br />
+      </div>
+
+      <div className="gameChoice">
+        <b>Game ID:</b>
+        <input
+          className="gameInput"
+          value={gameInput}
+          onChange={(event) => setGameInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') switchGame();
+          }}
+        />
+        <button className="gameButton" onClick={switchGame}>Join / Create</button>
+        <span className="gameCurrent">Current: {currentGame}</span>
       </div>
 
       <div className="colorChoice">
