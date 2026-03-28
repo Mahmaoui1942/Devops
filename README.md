@@ -1,112 +1,74 @@
 # ISIMA Pixel War 2026 — DevOps
 
-Plateforme Cloud-Native complète pour une Pixel War collaborative en temps réel.
+Ce dépôt présente une mise en production Cloud-Native d’un MVP Pixel War, avec automatisation IaC, déploiement Kubernetes, CI/CD et observabilité.
 
-## Architecture
+## 1) Architecture cible
 
 ```
 Internet
    │
    ▼
-[Ingress nginx]
-   ├── /       → frontend (React, nginx) ×2
-   └── /api    → backend  (Flask)        ×2
+[Ingress GKE (gce)]
+   ├── /       → frontend (React + nginx)
+   └── /api    → backend  (Flask + Gunicorn)
                      │
                      ▼
-               [PostgreSQL] (StatefulSet, PVC 5Gi)
+               [PostgreSQL StatefulSet + PVC]
 
-[Namespace: monitoring]
-   ├── Prometheus (scrape backend + nodes)
-   └── Grafana    (dashboards PixelWar)
+[Namespace monitoring]
+   ├── Prometheus
+   └── Grafana
 ```
 
-**Stack :**
-| Couche | Technologie |
+### Stack technique
+
+| Couche | Choix |
 |---|---|
 | Frontend | React + Canvas API, servi par nginx |
-| Backend | Python / Flask + Gunicorn |
-| Base de données | PostgreSQL 15 (StatefulSet) |
-| IaC | Terraform (GKE, Artifact Registry, IAM) |
-| Configuration | Ansible (common hardening, Docker) |
-| Conteneurs | Docker multi-stage (images minimales) |
-| Orchestration | Kubernetes / GKE |
+| Backend | Python Flask + Gunicorn |
+| Données | PostgreSQL 15 (StatefulSet + PVC) |
+| IaC | Terraform (GCP/GKE/Artifact Registry/IAM) |
+| Configuration | Ansible (`common`, `docker`) |
+| Orchestration | Kubernetes (GKE) |
 | CI/CD | GitHub Actions |
 | Observabilité | Prometheus + Grafana |
 
----
-
-## Déploiement de zéro
+## 2) Déploiement de zéro
 
 ### Prérequis
 
 ```bash
-# Outils requis
-gcloud  >= 450
+gcloud >= 450
 terraform >= 1.6
 kubectl >= 1.28
 ansible >= 2.14
-docker  >= 24
+docker >= 24
 ```
 
-### 1. Terraform — Provisionner l'infrastructure GCP
+### 2.1 Provisionnement infra (Terraform)
 
 ```bash
 cd terraform
-
-# Authentification GCP
-gcloud auth application-default login
-
-# Initialiser et déployer
 terraform init
 terraform plan
 terraform apply
-
-# Récupérer les credentials kubectl
-$(terraform output -raw get_credentials_cmd)
 ```
 
-Terraform crée :
-- Cluster GKE (2 nœuds `e2-medium`, Network Policy Calico activé, Workload Identity)
-- Artifact Registry Docker (`europe-west1-docker.pkg.dev/…/pixel-war`)
-- Service Account CI/CD avec rôles minimaux (`artifactregistry.writer`, `container.developer`)
+Si l’exécution échoue avec des `403` (`compute.instanceGroupManagers.get`, `iam.serviceAccounts.get`), le compte/SA ne possède pas les permissions IAM nécessaires sur le projet.
 
-### 2. Ansible — Configurer les nœuds (optionnel sur GKE managé)
-
-Pour des VMs custom ou un cluster bare-metal :
+### 2.2 Configuration hôtes (Ansible, optionnel sur GKE managé)
 
 ```bash
 cd ansible
-
-# Éditer l'inventaire avec vos IPs
-nano inventory.ini
-
-# Lancer le playbook complet
 ansible-playbook -i inventory.ini site.yml
 ```
 
-Le playbook `site.yml` applique :
-- **Role `common`** : packages, timezone, swap désactivé, sysctl k8s, hardening SSH
-- **Role `docker`** : installation Docker CE, daemon configuré (log rotation, `no-new-privileges`)
-
-### 3. Build & Push des images Docker (manuel, ou via CI/CD)
+### 2.3 Déploiement Kubernetes
 
 ```bash
-# Backend
-docker build -t europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/backend:latest ./Backend
-docker push europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/backend:latest
+kubectl create namespace pixelwar || true
 
-# Frontend
-docker build -t europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/frontend:latest ./pixel-war
-docker push europe-west1-docker.pkg.dev/pixel-war-489910/pixel-war/frontend:latest
-```
-
-### 4. Kubernetes — Déployer l'application
-
-```bash
-# Créer le namespace
-kubectl create namespace pixelwar
-
-# Appliquer les manifests (ordre important)
+kubectl apply -f k8s/priority-classes.yaml
 kubectl apply -f k8s/secret.yaml           -n pixelwar
 kubectl apply -f k8s/db.yaml               -n pixelwar
 kubectl apply -f k8s/backend.yaml          -n pixelwar
@@ -114,87 +76,85 @@ kubectl apply -f k8s/frontend.yaml         -n pixelwar
 kubectl apply -f k8s/network-policies.yaml -n pixelwar
 kubectl apply -f k8s/ingress/              -n pixelwar
 
-# Stack de monitoring
 kubectl apply -f k8s/monitoring/namespace.yaml
-kubectl apply -f k8s/monitoring/          -n monitoring
-
-# Vérifier
-kubectl get pods -n pixelwar
-kubectl get pods -n monitoring
+kubectl apply -f k8s/monitoring/ -n monitoring
 ```
 
-### 5. CI/CD — GitHub Actions
+## 3) Pipeline CI/CD
 
-Ajouter ces secrets dans `Settings > Secrets > Actions` du dépôt GitHub :
+Secret requis côté GitHub :
 
-| Secret | Valeur |
+| Secret | Description |
 |---|---|
-| `GCP_SA_KEY` | JSON de la clé du SA (cf. `terraform output cicd_service_account`) |
+| `GCP_SA_KEY` | Clé JSON du service account utilisé par GitHub Actions |
 
-Le pipeline se déclenche automatiquement sur chaque push `main` :
-1. **Test** — lint flake8 du backend
-2. **Build & Push** — images taguées `sha` + `latest` vers Artifact Registry
-3. **Deploy** — `kubectl set image` + attente du rollout
+Le workflow fait :
+1. tests/lint backend,
+2. build + push images backend/frontend,
+3. apply manifests Kubernetes,
+4. rollout status,
+5. récupération adresse ingress,
+6. smoke test HTTP public,
+7. debug automatique (pods/endpoints/ingress/logs) en sortie.
 
-### 6. Accéder à l'application
+## 4) Utilisation de l’application
 
 ```bash
-# Frontend
-kubectl get svc frontend -n pixelwar
-# → External IP du LoadBalancer
+kubectl get ingress -n pixelwar
+```
 
-# Grafana
-kubectl get svc grafana -n monitoring
-# → External IP:3000  (admin / pixelwar2026!)
+Puis ouvrir `http://<INGRESS_IP>/`.
 
-# Créer une partie pour commencer
-curl -X POST http://<BACKEND_IP>:5000/games \
+API (exemples) :
+
+```bash
+# créer/rejoindre une partie
+curl -X POST http://<INGRESS_IP>/api/games \
   -H 'Content-Type: application/json' \
   -d '{"game_id":"main","title":"ISIMA 2026","width":50,"height":50}'
+
+# lire la grille
+curl http://<INGRESS_IP>/api/games/main/grid
 ```
 
----
+Le frontend supporte plusieurs parties via `game_id` (champ UI + URL `?game=<id>`).
 
-## Sécurité
+## 5) Sécurité
 
-| Mesure | Détail |
-|---|---|
-| Secrets K8s | Variables sensibles dans `Secret` (jamais en clair dans les Deployments) |
-| Conteneurs non-root | `runAsNonRoot: true`, `runAsUser` défini sur tous les pods |
-| Read-only filesystem | `readOnlyRootFilesystem: true` sur le backend |
-| Drop capabilities | `capabilities.drop: [ALL]` sur tous les conteneurs |
-| NetworkPolicies | Deny-all par défaut, flux autorisés explicitement (frontend→backend→db) |
-| SSH hardening | Root login et authentification par mot de passe désactivés via Ansible |
-| GKE Shielded Nodes | Secure Boot + Integrity Monitoring activés |
-| Service Account CI/CD | Privilèges minimaux (pas de `roles/owner` ou `roles/editor`) |
+- Secrets applicatifs centralisés dans `Secret` Kubernetes.
+- Conteneurs non-root + capabilities minimales (`drop: [ALL]`).
+- `readOnlyRootFilesystem` sur backend.
+- NetworkPolicies : deny-all + flux explicitement autorisés.
+- Node hardening (Ansible) pour scénarios VM/bare-metal.
 
-## Résilience
+## 6) Résilience et performance
 
-- **Backend** : 2 replicas + HPA (scale jusqu'à 6 sur CPU > 70%)
-- **Frontend** : 2 replicas
-- **Base de données** : StatefulSet avec PVC (survit aux redémarrages de pod et de nœud)
-- **Auto-repair / auto-upgrade** : activé sur le node pool GKE
+- Backend avec HPA (`1 → 6` réplicas sur CPU).
+- PostgreSQL en StatefulSet + PVC persistante.
+- PriorityClass dédiée DB (`pixelwar-db-critical`) pour limiter le risque de starvation.
+- Optimisation backend de pose de pixel via `jsonb_set(...)` (mise à jour d’une cellule, pas de réécriture complète de la grille).
+- Polling frontend rendu plus réactif, avec garde anti-requêtes concurrentes.
 
-## Choix techniques justifiés
+## 7) Justification des choix
 
-**PostgreSQL vs Redis** : La grille est un état persistant structuré (tableau 2D). PostgreSQL avec JSONB permet des mises à jour atomiques par pixel (`UPDATE … SET grid = …`) et survit naturellement aux pannes contrairement à un cache mémoire.
+- **PostgreSQL** : persistance forte + JSONB adapté à l’état global de la grille.
+- **StatefulSet pour DB** : identité stable + stockage persistant.
+- **Gunicorn** : exécution production Flask.
+- **Docker multi-stage** : images plus légères et reproductibles.
+- **GKE Ingress (gce)** : exposition HTTP managée, intégrée à GCP.
 
-**StatefulSet vs Deployment pour la DB** : Un StatefulSet garantit une identité réseau stable (`db-0`) et une association persistante PVC/pod, ce qui est requis pour une base de données.
+## 8) Correspondance avec les critères du sujet
 
-**Gunicorn** : Serveur WSGI multi-processus pour Flask en production (remplace le serveur de développement intégré).
+- **Automatisation** : Terraform + Ansible + CI/CD, faible intervention manuelle.
+- **Sécurité** : secrets, non-root, NetworkPolicies, réduction des privilèges.
+- **Qualité infra/code** : manifests séparés, Dockerfiles multi-stage, pipeline lisible.
+- **Résilience** : HPA, stockage persistant, mécanismes de scheduling prioritaire.
+- **Observabilité** : Prometheus + Grafana opérationnels.
 
-**Multi-stage Dockerfile** : L'image frontend compile React dans un stage Node puis copie le build statique dans nginx:alpine — image finale < 30 MB sans outils de build.
+## 9) Domaine personnalisé (optionnel)
 
-## Développement local
+Pour remplacer l’IP publique par un nom de domaine :
 
-```bash
-# Tout en un avec Docker Compose
-docker compose up --build
-
-# Frontend : http://localhost:3000
-# Backend  : http://localhost:5000
-# Créer une partie :
-curl -X POST http://localhost:5000/games \
-  -H 'Content-Type: application/json' \
-  -d '{"game_id":"test","title":"Local","width":30,"height":30}'
-```
+1. disposer d’un domaine (payant ou existant),
+2. créer un enregistrement DNS `A` vers l’IP ingress,
+3. ajouter une règle `host` dans l’ingress (quand l’admission webhook cluster est sain).
